@@ -3,32 +3,48 @@
 #include <motor.h>
 #include <LiquidCrystal.h>
 
-//definig variables for tape follow
+// tape_follow() variables
 int left_s;                                          //the analog input number of the left QRD sensor
 int right_s;                                         //the analog input number of the right QRD sensor
-int P;
-int D;
-int G;
 int q,gain,count;
 int m=1;
 int recent_error=0;
 int error;
 int last_error=0;
 
-//menu variable
+//Menu() variable
 int menu_next;                                        //Digital input number for the menu_next button
 int menu_set;                                         //Digital input number for the menu_set button 
 int motorSpeed;
 int Kp;
 int Kd;
-int thresh;
+int QRD_thresh;
+int P,D;
 
-//Motor variables
-int arm__state=0;                                      //The initial arm_state should be down
+//Arm() variables
+int arm_state=0;                                       //The initial arm_state should be down
 int arm_motor;                                         //The motor number that the arm motor is connected
 int arm_speed;                                         //Speed pf the arm
 int down_sensor;                                       //the analog input number of the down bumper switch
 int up_sensor;                                         //The analog input number of the up bumper switch
+
+ //difining variables for IR_follower()
+int IR_Kp, IR_Kd;
+int left_IR;
+int right_IR;
+int IR_motorSpeed;
+int IR_thresh;                                         //Threshold to change the gains for the IR sensors
+int IR_difference;                                     //IR_differenceold for (left_IR - right_IR)
+int left_IR1;                                          //Analog input for the left_IR1
+int left_IR2;                                          //Analog input for the left_IR2
+int right_IR1;                                         //Analog input for the right_IR1
+int right_IR2;                                         //Analog input for the right_IR2
+int IR_P, IR_D;
+int IR_q,IR_gain,IR_count;
+int IR_m=1;
+int IR_recent_error=0;
+int IR_error;
+int IR_last_error=0;
 
 
 //General variables
@@ -169,7 +185,7 @@ void Menu()
       LCD.clear();
       LCD.home();
       LCD.setCursor(0,0);
-      LCD.print("Thresh ="); LCD.print(thresh); 
+      LCD.print("QRD_thresh ="); LCD.print(QRD_thresh); 
       LCD.setCursor(0,1);
       LCD.print("set=change value");
       delay(20);
@@ -180,8 +196,8 @@ void Menu()
           LCD.clear();
           LCD.home();
           LCD.setCursor(0,0);
-          LCD.print("Thresh = "); LCD.print(knob(6));
-          thresh = knob(6); 
+          LCD.print("QRD_thresh = "); LCD.print(knob(6));
+          QRD_thresh = knob(6); 
           delay(20);
         }
       }
@@ -215,13 +231,14 @@ void Arm(int state)
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 void tape_follow()
 {
+
   left_s = analogRead(left_s);                                  //Left QRD attached to analog 0
   right_s = analogRead(right_s);                                 //right QRD attached to analog 1
 
-  if ((left_s>thresh)&&(right_s>thresh)) error = 0; 
-  if ((left_s>thresh)&&(right_s<thresh)) error = -1; 
-  if ((left_s<thresh)&&(right_s>thresh)) error = +1; 
-  if ((left_s<thresh)&&(right_s<thresh)) 
+  if ((left_s>QRD_thresh)&&(right_s>QRD_thresh)) error = 0; 
+  if ((left_s>QRD_thresh)&&(right_s<QRD_thresh)) error = -1; 
+  if ((left_s<QRD_thresh)&&(right_s>QRD_thresh)) error = +1; 
+  if ((left_s<QRD_thresh)&&(right_s<QRD_thresh)) 
   { 
     if (last_error>0) error = 3; 
     if (last_error<=0) error=-3 ; 
@@ -270,7 +287,72 @@ void Arm_state()
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 //IR_follower()
 /////////////////////////////////////////////////////////////////////////////////////////////////////
-
+void IR_follower ()
+{
+ //difining variables for IR_follower()
+ int IR_Kp, IR_Kd;
+ int left_IR;
+ int right_IR;
+ int IR_thresh;                                               //Threshold to change the gains for the IR sensors
+ int left_IR1;                                                //Analog input for the left_IR1
+ int left_IR2;                                                //Analog input for the left_IR2
+ int right_IR1;                                               //Analog input for the right_IR1
+ int right_IR2;                                               //Analog input for the right_IR2
+ int IR_P, IR_D, G;
+ int IR_q,IR_gain,IR_count;
+ int IR_m=1;
+ int IR_recent_error=0;
+ int IR_error;
+ int IR_last_error=0;
+ int IR_difference;                                              //IR_differenceold for (left_IR - right_IR)
+  
+  left_IR = analogRead(left_IR1);                                  //Left IR1 
+  if (left_IR >= IR_thresh)
+    left_IR= analogRead(left_IR2);
+    
+  right_IR = analogRead(right_IR1);                                //Right IR2
+  if (right_IR >= IR_thresh)
+    right_IR= analogRead(right_IR2);
+    
+  if ( abs(left_IR - right_IR) < IR_difference ) IR_error=0;
+  if ((left_IR - right_IR) > IR_difference) IR_error=-1;
+  if ((right_IR -left_IR )> IR_difference) IR_error=1;
+  if ((left_IR < IR_difference) && (right_IR < IR_difference))
+  { 
+    if (IR_last_error>0) IR_error = 3; 
+    if (IR_last_error<=0) IR_error=-3 ; 
+  }
+  
+  if (IR_error != IR_last_error)
+  {
+     IR_recent_error = IR_last_error;
+     IR_q = IR_m;
+     IR_m = 1;
+  }
+   IR_P= IR_Kp*IR_error; 
+   IR_D= (int)((float)IR_Kd*(float)(IR_error - IR_recent_error)/(float)(IR_q + IR_m));
+   IR_gain= (IR_P+IR_D)/(sqrt(left_IR + right_IR));
+   
+   if (IR_count=50)
+  {
+    LCD.clear();
+    LCD.home();
+    LCD.setCursor(0,0);
+    LCD.print("l_s="); LCD.print(left_IR);  LCD.print(","); LCD.print("r_s=");  LCD.print( right_IR);
+    delay(10);
+    LCD.setCursor(0,1);
+    //LCD.print("L_m="); LCD.print(-motorSpeed+gain); LCD.print(","); LCD.print("r_m="); LCD.print(motorSpeed+gain);
+    IR_count=0;
+  }
+  
+  IR_count = IR_count+1; 
+  IR_m = IR_m + 1;
+  IR_last_error = IR_error;
+  
+  motor.speed(0, IR_motorSpeed);    //right motor
+  motor.speed(1, IR_motorSpeed);     //left motor
+  RCServo1.write (int(90 + IR_gain));    // turning the servo  
+}
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
