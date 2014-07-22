@@ -1,3 +1,10 @@
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Phys 253 robotic lab
+// summer 2014
+// Author: Shayan Rezaiezadeh
+//Email: shayan@alumni.ubc.ca
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #include <phys253.h>
 #include <Servo253.h>
 #include <motor.h>
@@ -29,6 +36,7 @@ int down_sensor;                                       //the analog input number
 int up_sensor;                                         //The analog input number of the up bumper switch
 
  //difining variables for IR_follower()
+int rock_state=0;                                      //0= robot is not on the rock-pit    1= robot is on the rock-pit
 int IR_Kp, IR_Kd;
 int left_IR;
 int right_IR;
@@ -56,6 +64,7 @@ void setup()
 {
   pinMode(0,INPUT);
   attachInterrupt(0, Arm_state, FALLING);
+  attachInterrupt(1, Rock_state, FALLING);
   
   /////////////////////////////////////////////set up motors left_motor,right_motor,arm_motor
   
@@ -70,37 +79,39 @@ void loop()
   {
      while(artifact_number <= 3)
      {
-       if ( down_sensor != LOW)
-         Arm(0);                                   //Brings the arm down
-         
-       if ( arm_state == 0)                       //No artifact is attached               
+       if (arm_state==1)
+         IR_follow();
+       else
        {
-         tape_follow();
-       }
-       else if ( up_sensor != LOW)                //checks if the arm is not up
+         if ( digitalRead(down_sensor) != LOW)
+           Arm(0);                                   //Brings the arm down
+         
+         if ( arm_state == 0)                       //No artifact is attached               
          {
-           Arm(1);                                //brings the arm down
            tape_follow();
          }
-       else                                       //if the arm is up
-       {
-         artifact_number ++;                      //adds 1 to the number of artifacts
-         if (down_sensor != LOW)                  //checks if the arm is not down 
+         else if ( digitalRead(up_sensor) != LOW)                //checks if the arm is not up
+           {
+             Arm(1);                                //brings the arm down
+             tape_follow();
+           }
+         else                                       //if the arm is up
          {
-           Arm(0);                                //brings the arm down
-           tape_follow();  
+           artifact_number ++;                      //adds 1 to the number of artifacts
+           if (digitalRead(down_sensor) != LOW)                  //checks if the arm is not down 
+           {
+             Arm(0);                                //brings the arm down
+             tape_follow();  
+           }
+           else                                      //arm is down
+           {
+             arm_state=0;                            //changes the arm_state to down
+             motor.stop(arm_motor);                  //stops the arm motor
+           }
          }
-         else                                      //arm is down
-         {
-           arm_state=0;                            //changes the arm_state to down
-           motor.stop(arm_motor);                  //stops the arm motor
-         }
-       }   
-     }
-  }
-  
-  
-
+        }
+       }
+    }
 }
 
 
@@ -202,7 +213,75 @@ void Menu()
         }
       }
     }
-  delay(200);
+  delay(300);
+   while(digitalRead(menu_next) != LOW)
+    {
+      LCD.clear();
+      LCD.home();
+      LCD.setCursor(0,0);
+      LCD.print("IR_Kp = "); LCD.print(IR_Kp); 
+      LCD.setCursor(0,1);
+      LCD.print("set=change value");
+      delay(20);
+      if(digitalRead(menu_set) == LOW)
+      {
+        while(digitalRead(menu_next)!= LOW)
+        {
+          LCD.clear();
+          LCD.setCursor(0,0);
+          LCD.print("IR_Kp = "); LCD.print(knob(6));
+          IR_Kp = knob(6); 
+          delay(20);
+        }
+      }
+    }
+    delay(300);
+     while(digitalRead(menu_next) != LOW)
+    {
+      LCD.clear();
+      LCD.home();
+      LCD.setCursor(0,0);
+      LCD.print("IR_Kd = "); LCD.print(IR_Kd); 
+      LCD.setCursor(0,1);
+      LCD.print("set=change value");
+      delay(20);
+      if(digitalRead(menu_set) == LOW)
+      {
+        while(digitalRead(menu_next)!= LOW)
+        {
+          LCD.clear();
+          LCD.setCursor(0,0);
+          LCD.print("IR_Kd = "); LCD.print(knob(6));
+          IR_Kd = knob(6); 
+          delay(20);
+        }
+      }
+    }
+    delay(300);
+    delay(300);
+    while(digitalRead(menu_next) != LOW)
+    {
+      LCD.clear();
+      LCD.home();
+      LCD.setCursor(0,0);
+      LCD.print("IR_thresh ="); LCD.print(IR_thresh); 
+      LCD.setCursor(0,1);
+      LCD.print("set=change value");
+      delay(20);
+      if(digitalRead(menu_set) == LOW)
+      {
+        while(digitalRead(menu_next) != LOW)
+        {
+          LCD.clear();
+          LCD.home();
+          LCD.setCursor(0,0);
+          LCD.print("IR_thresh = "); LCD.print(knob(6));
+          IR_thresh = knob(6); 
+          delay(20);
+        }
+      }
+    }
+    delay(200);
   }
 
 
@@ -283,11 +362,21 @@ void Arm_state()
   arm_state= 1;
  }
  
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+//Rock_state()
+//detects the rock-pit - connected to interrupt1
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+ void Rock_state()
+ {
+   if (artifact_number==3)
+   rock_state=1;
+ }
  
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 //IR_follower()
 /////////////////////////////////////////////////////////////////////////////////////////////////////
-void IR_follower ()
+void IR_follow ()
 {
  //difining variables for IR_follower()
  int IR_Kp, IR_Kd;
