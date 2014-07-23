@@ -11,13 +11,16 @@
 #include <LiquidCrystal.h>
 
 // tape_follow() variables
-int left_s;                                          //the analog input number of the left QRD sensor
-int right_s;                                         //the analog input number of the right QRD sensor
+int left_sensor;                                          //the analog input number of the left QRD sensor
+int right_sensor;                                         //the analog input number of the right QRD sensor
+int left_s;
+int right_s;
 int q,gain,count;
 int m=1;
 int recent_error=0;
 int error;
 int last_error=0;
+int servo_correction;                                //correction number get sent to the servo.
 
 //Menu() variable
 int menu_next;                                        //Digital input number for the menu_next button
@@ -53,6 +56,7 @@ int IR_m=1;
 int IR_recent_error=0;
 int IR_error;
 int IR_last_error=0;
+int IR_servo_correction;
 
 
 //General variables
@@ -63,6 +67,7 @@ int artifact_number= 0;
 void setup() 
 {
   pinMode(0,INPUT);
+  pinMode(35,OUTPUT);                          //set servo_0 to output
   attachInterrupt(0, Arm_state, FALLING);
   attachInterrupt(1, Rock_state, FALLING);
   
@@ -79,7 +84,7 @@ void loop()
   {
      while(artifact_number <= 3)
      {
-       if (arm_state==1)
+       if (rock_state==1)
          IR_follow();
        else
        {
@@ -311,8 +316,8 @@ void Arm(int state)
 void tape_follow()
 {
 
-  left_s = analogRead(left_s);                                  //Left QRD attached to analog 0
-  right_s = analogRead(right_s);                                 //right QRD attached to analog 1
+  left_s = analogRead(left_sensor);                                  //Left QRD attached to analog 0
+  right_s = analogRead(right_sensor);                                 //right QRD attached to analog 1
 
   if ((left_s>QRD_thresh)&&(right_s>QRD_thresh)) error = 0; 
   if ((left_s>QRD_thresh)&&(right_s<QRD_thresh)) error = -1; 
@@ -348,7 +353,11 @@ void tape_follow()
   
   motor.speed(0, motorSpeed);    //right motor
   motor.speed(1, motorSpeed);     //left motor
-  RCServo1.write (int(90+gain));    // turning the servo
+  
+  servo_correction= 90+gain;
+  if((servo_correction)>180) servo_correction=180;
+  if (servo_correction<0) servo_correction=0; 
+  RCServo0.write (servo_correction);    // turning the servo
   
 }
 
@@ -377,24 +386,7 @@ void Arm_state()
 //IR_follower()
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 void IR_follow ()
-{
- //difining variables for IR_follower()
- int IR_Kp, IR_Kd;
- int left_IR;
- int right_IR;
- int IR_thresh;                                               //Threshold to change the gains for the IR sensors
- int left_IR1;                                                //Analog input for the left_IR1
- int left_IR2;                                                //Analog input for the left_IR2
- int right_IR1;                                               //Analog input for the right_IR1
- int right_IR2;                                               //Analog input for the right_IR2
- int IR_P, IR_D, G;
- int IR_q,IR_gain,IR_count;
- int IR_m=1;
- int IR_recent_error=0;
- int IR_error;
- int IR_last_error=0;
- int IR_difference;                                              //IR_differenceold for (left_IR - right_IR)
-  
+{ 
   left_IR = analogRead(left_IR1);                                  //Left IR1 
   if (left_IR >= IR_thresh)
     left_IR= analogRead(left_IR2);
@@ -440,7 +432,11 @@ void IR_follow ()
   
   motor.speed(0, IR_motorSpeed);    //right motor
   motor.speed(1, IR_motorSpeed);     //left motor
-  RCServo1.write (int(90 + IR_gain));    // turning the servo  
+  
+  IR_servo_correction= 90+gain;
+  if((IR_servo_correction)>180) IR_servo_correction=180;
+  if (IR_servo_correction<0) IR_servo_correction=0; 
+  RCServo0.write (int(IR_servo_correction));              // turning the servo  
 }
 
 
