@@ -1,3 +1,5 @@
 *.o
 *.elf
 *.hex
+*.ccp
+*.a
