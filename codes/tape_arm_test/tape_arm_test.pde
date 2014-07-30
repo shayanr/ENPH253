@@ -1,4 +1,4 @@
- #include <phys253.h>
+#include <phys253.h>
 #include <Servo253.h>
 #include <motor.h>
 #include <LiquidCrystal.h>
@@ -378,7 +378,7 @@ void tape_follow()
   left_s = analogRead(left_sensor);                                  //Left QRD attached to analog 0
   right_s = analogRead(right_sensor);                                 //right QRD attached to analog 1
 
-  if ((left_s>left_QRD_thresh)&&(right_s>right_QRD_thresh)) error = 0; 
+  if ((left_s1>left_QRD_thresh)&&(right_s1>right_QRD_thresh)) error = 0; 
   if ((left_s>left_QRD_thresh)&&(right_s<right_QRD_thresh)) error = -error_one; 
   if ((left_s<left_QRD_thresh)&&(right_s>right_QRD_thresh)) error = +error_one; 
   if ((left_s<left_QRD_thresh)&&(right_s<right_QRD_thresh)) 
