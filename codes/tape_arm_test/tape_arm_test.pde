@@ -29,7 +29,8 @@ boolean coming_down= false;
 int artifact_number;
 int artifact_s=3;
 int arm_motor=2;                                        //motor number for the arm
-int arm_speed=200;
+int arm_speed_up=800;
+int arm_speed_down=450;
 int arm_down=2;                                         //digital input of the arm_down push button
 
 //sonar variables
@@ -103,7 +104,8 @@ void loop()
       tape_follow();
       if(digitalRead(arm_down)!= LOW)                        //arm is not down
       {
-        motor.speed(arm_motor,arm_speed);                    //brings the arm down
+        motor.speed(arm_motor,800);
+        motor.speed(arm_motor,arm_speed_down);                    //brings the arm down
         tape_follow();
       }
       else                                                   //arm is down and there is no artifact attached 

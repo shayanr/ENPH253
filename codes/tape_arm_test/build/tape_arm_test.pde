@@ -5,18 +5,6 @@
 #include <EEPROM.h>
 
 // tape_follow() variables
-#include "WProgram.h"
-#include <HardwareSerial.h>
-void setup();
-void loop();
-void Save (int address, int value);
-int getEepromValue(int address);
-void Countdown();
-void Menu();
-void displayValue(const char* display, int value);
-int SetValue(const char* display, int knobScale);
-void tape_follow();
-void turn();
 int left_sensor=0;                                          //the analog input number of the left QRD sensor
 int right_sensor=1;  
 
@@ -545,4 +533,3 @@ void turn()
   
 }
  
-
