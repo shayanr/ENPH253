@@ -4,6 +4,13 @@
 #include <LiquidCrystal.h>
 
 // tape_follow() variables
+#include "WProgram.h"
+#include <HardwareSerial.h>
+void setup();
+void loop();
+void Menu();
+void tape_follow();
+void turn();
 int left_sensor=0;                                          //the analog input number of the left QRD sensor
 int right_sensor=1;                                         //the analog input number of the right QRD sensor
 int rock_sensor=4;                                          //the digital input of the rock sensor
@@ -26,7 +33,7 @@ boolean coming_down= false;
 int artifact_number;
 int artifact_s=3;
 int arm_motor=2;                                        //motor number for the arm
-int arm_speed=200;
+int arm_speed=150;
 int arm_down=5;                                         //digital input of the arm_down push button
 
 //sonar variables
@@ -519,3 +526,4 @@ void turn()
   
 }
  
+

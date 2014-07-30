@@ -26,7 +26,7 @@ boolean coming_down= false;
 int artifact_number;
 int artifact_s=3;
 int arm_motor=2;                                        //motor number for the arm
-int arm_speed=200;
+int arm_speed=150;
 int arm_down=5;                                         //digital input of the arm_down push button
 
 //sonar variables
