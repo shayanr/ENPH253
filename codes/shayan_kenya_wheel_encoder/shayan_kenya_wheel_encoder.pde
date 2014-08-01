@@ -42,11 +42,6 @@ long count1,count2;
 long t1,t2;
 double velocity=0.0;
 double circumference = 3.0;
-int motorSpeedJump=100;
-int motorSpeed_thresh=0;
-int encoder_time=1;
-int if_already_increased=0;                             //shows if we have already increased the speed or not
-
 
 //sonar variables
 int sonar_distance=0 ;
@@ -67,6 +62,8 @@ int IR_KdEEPROM=10;
 int IR_motorSpeedEEPROM=12;
 int IR_threshEEPROM=14; 
 int error_twoEEPROM=16;
+int target_velocityEEPROM=18;
+int motorSpeedJumpEEPROM=20;
 
 //Menu() variable
 int menu_next=6;                                        //Digital input number for the menu_next button
@@ -80,6 +77,8 @@ int right_QRD_thresh=getEepromValue(right_QRD_threshEEPROM);
 int P,D;
 int error_one = 1;
 int error_two = getEepromValue(error_twoEEPROM);
+int motorSpeedJump= getEepromValue(motorSpeedJumpEEPROM);
+int target_velocity=  getEepromValue(target_velocityEEPROM);
 
 //difining variables for IR_follower()
 double I=0;
@@ -265,6 +264,34 @@ void Menu()
     if(startbutton())
       return;
       
+      
+      while(digitalRead(menu_next)!= LOW && !startbutton())
+    {
+      displayValue("speedJump =",motorSpeedJump);
+      if(digitalRead(menu_set) == LOW)
+      {
+         motorSpeedJump = SetValue("speedJump =",1);
+         Save(motorSpeedJumpEEPROM, motorSpeedJump);
+       }
+    }
+    delay(200);
+    if(startbutton())
+      return;
+      
+      while(digitalRead(menu_next)!= LOW && !startbutton())
+    {
+      displayValue("TargetSpeed =",target_velocity);
+      if(digitalRead(menu_set) == LOW)
+      {
+         target_velocity = SetValue("Targetspeed =",1);
+         Save(target_velocityEEPROM, target_velocity);
+       }
+    }
+    delay(200);
+    if(startbutton())
+      return;
+      
+      
     while(digitalRead(menu_next) != LOW && !startbutton())
     {
       displayValue("l_QRD_thresh =",left_QRD_thresh);
@@ -437,22 +464,19 @@ void tape_follow()
   {
     count2=encoder_counter;
     t2=millis();
-    velocity= ((count2 - count1)*(circumference)*1000.0)/( double((24.0*(t2-t1)))); 
+    velocity= ((count2 - count1)*(circumference)*1000.0)/( double((96.0*(t2-t1)))); 
     encoder_counter=0;
-    encoder_time=0;
-    
+    if ( (velocity - target_velocity) > (0.2* target_velocity) ) motorSpeed= motorSpeed - motorSpeedJump;
+    if ( (target_velocity - velocity) > (0.2* target_velocity) ) motorSpeed= motorSpeed + motorSpeedJump;
 
     
     LCD.clear();
     LCD.home();
     LCD.setCursor(0,0);
-    LCD.print(motorSpeed);
+    LCD.print("motorSpeed=");LCD.print(motorSpeed);
 
     LCD.setCursor(0,1);
-    LCD.print("speed="); LCD.print(velocity);
- 
-    delay(20);
-    
+    LCD.print("velocity="); LCD.print(velocity);
     count=0;
   }
   
@@ -460,8 +484,8 @@ void tape_follow()
   m=m+1;
   last_error=error;
   
-  if ( velocity - tergt_velocity)
-  
+ 
+    
   RCServo0.write (servo_correction);    // turning the servo
   motor.speed(left_motor, motorSpeed + motor_gain);    //left motor
   motor.speed(right_motor, motorSpeed - motor_gain);     //right motor
