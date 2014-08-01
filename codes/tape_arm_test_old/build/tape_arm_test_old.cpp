@@ -1,4 +1,4 @@
- #include <phys253.h>
+#include <phys253.h>
 #include <Servo253.h>
 #include <motor.h>
 #include <LiquidCrystal.h>
@@ -17,49 +17,33 @@ void displayValue(const char* display, int value);
 int SetValue(const char* display, int knobScale);
 void tape_follow();
 void turn();
-void encoder();
-int left_sensor=1  ;                                          //the analog input number of the left QRD sensor
+int left_sensor=1;                                          //the analog input number of the left QRD sensor
 int right_sensor=0;  
 
 //the analog input number of the right QRD sensor
 int rock_sensor=0;                                          //the digital input of the rock sensor
 int left_s;
 int right_s;
-int q,gain,count=0;
+int q,gain,count;
 int m=1;
 int recent_error=0;
 int error;
 int last_error=0;
 int servo_correction=90;                                //correction number get sent to the servo.
-int max_turn=60;
+int max_turn=70;
 int motor_gain = 0;
 int left_motor=0;                                       //mototr pin number for left_motor  
 int right_motor=1;                                      //motor pin number for right_motor  
-int left_motor_offset=20;                              //left motor goes slower
 
 boolean coming_down= false;
 
 //arm variable
-int artifact_number;  
+int artifact_number;
 int artifact_s=3;
 int arm_motor=2;                                        //motor number for the arm
-int arm_speed_up=800;
-int arm_speed_down=300;
+int arm_speed_up=500;
+int arm_speed_down=250;
 int arm_down=2;                                         //digital input of the arm_down push button
-
-
-//Wheel encoder
-int encoder_pin=0;                                          //connected to INT0
-long encoder_counter = 0.0;
-long count1,count2;
-long t1,t2;
-double velocity=0.0;
-double circumference = 3.0;
-int motorSpeedJump=100;
-int motorSpeed_thresh=0;
-int encoder_time=1;
-int if_already_increased=0;                             //shows if we have already increased the speed or not
-
 
 //sonar variables
 int sonar_distance=0 ;
@@ -112,7 +96,6 @@ void setup()
   pinMode(pulse_echo,INPUT);
   pinMode(pulse_trig,OUTPUT);
   pinMode(35,OUTPUT);                                  //servo
-   attachInterrupt(encoder_pin, encoder, FALLING);                  //wheel encoder INT0
  
   RCServo0.attach(RCServo0Output);
   RCServo0.write(90);
@@ -133,7 +116,7 @@ void loop()
       tape_follow();
       if(digitalRead(arm_down)!= LOW)                        //arm is not down
       {
-      //  motor.speed(arm_motor,800);
+        motor.speed(arm_motor,1000);
         motor.speed(arm_motor,arm_speed_down);                    //brings the arm down
         tape_follow();
       }
@@ -147,6 +130,7 @@ void loop()
     else                                                    //artifact is attached
     {
       artifact_number++;
+       motor.speed(arm_motor,-1000); 
       motor.speed(arm_motor,-arm_speed_up);                        //brings the arm up
       tape_follow();
     }
@@ -435,17 +419,13 @@ void tape_follow()
   gain=P+D+I;
   if ((gain)>max_turn) gain = max_turn;
   if (gain < -max_turn) gain=-max_turn; 
-
   servo_correction= 90+gain;
+
   motor_gain = gain;
   
- ///////////////////Wheel encoder
-  if(count=1)
+  if (count=500)
   {
-    count1=encoder_counter;
-    t1 = millis();
-  }
-  
+   
  /*   //SONAR CODE
     //Makeing pulse
 
@@ -519,50 +499,22 @@ void tape_follow()
    
    
    */
-  if (count=500)
-  {
-    
-    /////////////////Wheel encoder
-    count2=encoder_counter;
-    t2=millis();
-    velocity= ((count2 - count1)*(circumference)*1000.0)/( double((24.0*(t2-t1)))); 
-    encoder_counter=0;
-    encoder_time=0;
     
     LCD.clear();
     LCD.home();
     LCD.setCursor(0,0);
-    LCD.print(motorSpeed);
-   // LCD.print("l_s="); LCD.print(left_s);  LCD.print(","); LCD.print("r_s=");  LCD.print( right_s);// LCD.print(","); LCD.print("Kp="); LCD.print(Kp); LCD.print(","); LCD.print(Kd); LCD.print(",");LCD.print(P); LCD.print(D);
+    LCD.print("l_s="); LCD.print(left_s);  LCD.print(","); LCD.print("r_s=");  LCD.print( right_s);// LCD.print(","); LCD.print("Kp="); LCD.print(Kp); LCD.print(","); LCD.print(Kd); LCD.print(",");LCD.print(P); LCD.print(D);
     //LCD.print("l_m="); LCD.print(motorSpeed + motor_gain);  LCD.print(","); LCD.print("r_m=");  LCD.print(  motorSpeed - motor_gain);// LCD.print(","); LCD.print("Kp="); LCD.print(Kp); LCD.print(","); LCD.print(Kd); LCD.print(",");LCD.print(P); LCD.print(D);
     LCD.setCursor(0,1);
     //LCD.print("g="); LCD.print(gain);LCD.print("I="); LCD.print(I);// LCD.print(","); LCD.print("r_m="); LCD.print(motorSpeed+gain);
-    LCD.print("speed="); LCD.print(velocity);//LCD.print("g="); LCD.print(gain);// LCD.print(","); LCD.print("r_m="); LCD.print(motorSpeed+gain);
- 
-    delay(20);
-    
+    LCD.print("dis="); LCD.print(sonar_distance);LCD.print("g="); LCD.print(gain);// LCD.print(","); LCD.print("r_m="); LCD.print(motorSpeed+gain);
     count=0;
   }
-  
   count=count+1; 
   m=m+1;
   last_error=error;
   
-  if ((velocity <= motorSpeed_thresh) && (encoder_time==0))
- {
-    motorSpeed= motorSpeed + motorSpeedJump;
-    if_already_increased=1;
- }
-  
-  encoder_time++;
-  if (encoder_time > 1000 && if_already_increased==1)
-  {
-    encoder_time=0;
-    motorSpeed=motorSpeed  - motorSpeedJump;
-    if_already_increased=0;
-  }
-  
-  
+
   RCServo0.write (servo_correction);    // turning the servo
   motor.speed(left_motor, motorSpeed + motor_gain);    //left motor
   motor.speed(right_motor, motorSpeed - motor_gain);     //right motor
@@ -585,21 +537,12 @@ void turn()
   delay(1000);
   
   RCServo0.write (90 - max_turn);    // turning the servo
-  motor.speed(left_motor, (motorSpeed-turn_gain)+left_motor_offset );    //left motor
+  motor.speed(left_motor, (motorSpeed-turn_gain) );    //left motor
   motor.speed(right_motor, (motorSpeed+turn_gain));     //right motor
   delay(1000);
   
   last_error=0;
   error=0;
   
-}
- 
- 
- /////////////////////////////////////////////////////////////////////////////////////////////
-//encoder()
-////////////////////////////////////////////////////////////////////////////////////////////
-void encoder()
-{
-  encoder_counter++ ;
 }
 

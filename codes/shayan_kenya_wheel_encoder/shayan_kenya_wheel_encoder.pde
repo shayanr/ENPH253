@@ -5,19 +5,6 @@
 #include <EEPROM.h>
 
 // tape_follow() variables
-#include "WProgram.h"
-#include <HardwareSerial.h>
-void setup();
-void loop();
-void Save (int address, int value);
-int getEepromValue(int address);
-void Countdown();
-void Menu();
-void displayValue(const char* display, int value);
-int SetValue(const char* display, int knobScale);
-void tape_follow();
-void turn();
-void encoder();
 int left_sensor=1  ;                                          //the analog input number of the left QRD sensor
 int right_sensor=0;  
 
@@ -446,98 +433,23 @@ void tape_follow()
     t1 = millis();
   }
   
- /*   //SONAR CODE
-    //Makeing pulse
-
-    digitalWrite(pulse_trig,LOW);
-    delayMicroseconds(2);
-    digitalWrite(pulse_trig, HIGH);
-    delayMicroseconds(10);
-    digitalWrite(pulse_trig, LOW);
-    
-    //Reading Pulse
-    sonar_distance = (pulseIn(pulse_echo,HIGH))/58.2 ;
-    
-    if (sonar_distance > 10*sonar_height)
-      {
-         motor.speed(left_motor,-500);
-         motor.speed(right_motor,-500);
-         delay(1000);
-      }
-      
-     if (digitalRead(rock_sensor)== LOW)                                                      //if the robot has hit the rocks
-     {
-       coming_down= true;
-       turn();
-     }      
-     
-    //Check for impending clift
-    if (coming_down == false)
-   {  
-     //Detect start of ramp   
-     if (sonar_state == 0 && sonar_distance < sonar_height-5 )
-     {
-       motorSpeed = motorSpeed + 100;
-       sonar_state = 1;
-     }
-   
-     //Detect end of ramp
-     if (sonar_state == 1 && sonar_distance > sonar_height+5 )
-     {
-       motorSpeed = motorSpeed - 100;
-       sonar_state = 2;
-     }
-   
-    //Detect Rocks
-    // if (sonar_state == 2 && sonar_distance < sonar_height+1)
-    //{
-    //  rock_state = 1;
-    //}
-   }
-   else                          //detects when we are coming down 
-   {
-     if (sonar_state == 2 && sonar_distance > sonar_height+50 )
-     {
-       motorSpeed = motorSpeed - 100;
-       sonar_state = 1;
-     }
-   
-     //Detect end of ramp
-     if (sonar_state == 1 && sonar_distance > sonar_height+50 )
-     {
-       motorSpeed = motorSpeed + 100;
-       sonar_state = 2;
-     }
-   
-     //Detect Rocks
-    // if (sonar_state == 2 && sonar_distance < sonar_height+1)
-     //{
-      // rock_state = 1;
-     //}
-     
-   }
-   
-   
-   */
   if (count=500)
   {
-    
-    /////////////////Wheel encoder
     count2=encoder_counter;
     t2=millis();
     velocity= ((count2 - count1)*(circumference)*1000.0)/( double((24.0*(t2-t1)))); 
     encoder_counter=0;
     encoder_time=0;
     
+
+    
     LCD.clear();
     LCD.home();
     LCD.setCursor(0,0);
     LCD.print(motorSpeed);
-   // LCD.print("l_s="); LCD.print(left_s);  LCD.print(","); LCD.print("r_s=");  LCD.print( right_s);// LCD.print(","); LCD.print("Kp="); LCD.print(Kp); LCD.print(","); LCD.print(Kd); LCD.print(",");LCD.print(P); LCD.print(D);
-    //LCD.print("l_m="); LCD.print(motorSpeed + motor_gain);  LCD.print(","); LCD.print("r_m=");  LCD.print(  motorSpeed - motor_gain);// LCD.print(","); LCD.print("Kp="); LCD.print(Kp); LCD.print(","); LCD.print(Kd); LCD.print(",");LCD.print(P); LCD.print(D);
+
     LCD.setCursor(0,1);
-    //LCD.print("g="); LCD.print(gain);LCD.print("I="); LCD.print(I);// LCD.print(","); LCD.print("r_m="); LCD.print(motorSpeed+gain);
-    LCD.print("speed="); LCD.print(velocity);//LCD.print("g="); LCD.print(gain);// LCD.print(","); LCD.print("r_m="); LCD.print(motorSpeed+gain);
+    LCD.print("speed="); LCD.print(velocity);
  
     delay(20);
     
@@ -548,20 +460,7 @@ void tape_follow()
   m=m+1;
   last_error=error;
   
-  if ((velocity <= motorSpeed_thresh) && (encoder_time==0))
- {
-    motorSpeed= motorSpeed + motorSpeedJump;
-    if_already_increased=1;
- }
-  
-  encoder_time++;
-  if (encoder_time > 1000 && if_already_increased==1)
-  {
-    encoder_time=0;
-    motorSpeed=motorSpeed  - motorSpeedJump;
-    if_already_increased=0;
-  }
-  
+  if ( velocity - tergt_velocity)
   
   RCServo0.write (servo_correction);    // turning the servo
   motor.speed(left_motor, motorSpeed + motor_gain);    //left motor
@@ -602,4 +501,3 @@ void encoder()
 {
   encoder_counter++ ;
 }
-

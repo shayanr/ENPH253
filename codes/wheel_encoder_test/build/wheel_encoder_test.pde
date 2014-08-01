@@ -4,9 +4,9 @@
 #include <LiquidCrystal.h>
 #include <EEPROM.h>
 
-double encoder_counter = 0;
-double count1,count2;
-double t1,t2;
+long encoder_counter = 0;
+long count1,count2;
+long t1,t2;
 double velocity;
 double circumference = 3.0;
 
@@ -42,7 +42,7 @@ void loop()
   */
   encoder_counter=0;
   
-  velocity= ((count2 - count1)*(circumference)*1000.0)/(24.0*(t2-t1)); 
+  velocity= ((count2 - count1)*(circumference)*1000.0)/( double((24.0*(t2-t1)))); 
  Serial.print("t1-t2= "); Serial.print(t1-t2);Serial.print("\n");
  Serial.print("count1-count2= "); Serial.print(count1-count2);Serial.print("\n");
  Serial.print("speed= "); Serial.print(velocity);
