@@ -5,7 +5,19 @@
 #include <EEPROM.h>
 
 //variables to tune in menu
-  int left_motor_offset=155;                              //left motor goes faster
+  #include "WProgram.h"
+#include <HardwareSerial.h>
+void setup();
+void loop();
+void Menu();
+void IR_follow();
+void Save (int address, int value);
+int getEepromValue(int address);
+void Countdown();
+void displayValue(const char* display, int value);
+int SetValue(const char* display, double knobScale);
+void encoder();
+int left_motor_offset=155;                              //left motor goes faster
   
 ///motor variables  
   int left_motor=0;                                       //mototr pin number for left_motor  
@@ -370,3 +382,4 @@ void encoder()
 {
   encoder_counter++ ;
 }
+
