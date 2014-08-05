@@ -11,6 +11,7 @@
   int left_motor=0;                                       //mototr pin number for left_motor  
   int right_motor=1;                                      //motor pin number for right_motor  
   int max_turn=60;
+  int max_motorSpeed=500;
   
 //Menu variable 
   int menu_next=6;                                        //Digital input number for the menu_next button
@@ -28,20 +29,20 @@ int IR_differenceEEPROM=24;
 
 //IR variables
 double I=0;
-int rock_state=0;                                      //0= robot is not on the rock-pit    1= robot is on the rock-pit
+int rock_state=0;                                              //0= robot is not on the rock-pit    1= robot is on the rock-pit
 int IR_Kp = getEepromValue(IR_KpEEPROM);
 int IR_Kd = getEepromValue(IR_KdEEPROM);
 int IR_motorSpeed = getEepromValue(IR_motorSpeedEEPROM);
-int IR_thresh = getEepromValue(IR_threshEEPROM);          //Threshold to change the gains for the IR sensors
+int IR_thresh = getEepromValue(IR_threshEEPROM);              //Threshold to change the gains for the IR sensors
 int target_velocity=  getEepromValue(target_velocityEEPROM);
 int motorSpeedJump= getEepromValue(motorSpeedJumpEEPROM);
 int IR_difference=getEepromValue(IR_differenceEEPROM);        //IR_differenceold for (left_IR - right_IR)
 int left_IR;
 int right_IR;
-int left_IR1=5;                                                //Analog input for the left_IR1
-int left_IR2=4;                                                //Analog input for the left_IR2
-int right_IR1=7;                                               //Analog input for the right_IR1
-int right_IR2=6;                                               //Analog input for the right_IR2
+int left_IR_low=3;                                                //Analog input for the left_IR_low
+int left_IR_high=4;                                                //Analog input for the left_IR_high 
+int right_IR_low=5;                                               //Analog input for the right_IR_low
+int right_IR_high=6;                                               //Analog input for the right_IR_high
 int IR_P, IR_D;
 int IR_q,IR_gain,IR_count=0;
 int IR_m=1;
@@ -65,6 +66,7 @@ void setup()
 {
  // portMode(1,OUTPUT);s
   portMode(0,INPUT);
+  portMode(2,INPUT);
   RCServo0.attach(RCServo0Output);
   RCServo0.write(90);
   Serial.begin(9600); 
@@ -109,7 +111,7 @@ void Menu()
       displayValue("IR_Kp = ",IR_Kp);
       if(digitalRead(menu_set) == LOW)
       {
-        IR_Kp = SetValue("IR_Kp = ",6);
+        IR_Kp = SetValue("IR_Kp = ",1);
         Save(IR_KpEEPROM,IR_Kp);
       }
     }
@@ -124,7 +126,7 @@ void Menu()
       
       if(digitalRead(menu_set) == LOW)
       {
-        IR_Kd = SetValue("IR_Kd = ",6);
+        IR_Kd = SetValue("IR_Kd = ",1);
         Save(IR_KdEEPROM,IR_Kd);
       }
     }
@@ -208,13 +210,13 @@ void Menu()
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void IR_follow()
 {
-  left_IR = analogRead(left_IR1);                                  //Left IR 
+  left_IR = analogRead(left_IR_high);                                  //Left IR 
   if (left_IR >= IR_thresh)
-    left_IR= analogRead(left_IR2);
+    left_IR= analogRead(left_IR_low);
     
-  right_IR = analogRead(right_IR1);                                //Right IR
+  right_IR = analogRead(right_IR_high);                                //Right IR
   if (right_IR >= IR_thresh)
-    right_IR= analogRead(right_IR2);
+    right_IR= analogRead(right_IR_low);
     
   if ( abs(left_IR - right_IR) < IR_difference ) IR_error=0;      //if 2 IR read almost the same value
   if ((left_IR - right_IR) > IR_difference) IR_error=-IR_error_one;          //if left reads more (Turn LEFT)
@@ -222,7 +224,7 @@ void IR_follow()
   if ((left_IR < IR_difference) && (right_IR < IR_difference))    //if both are off 
   { 
     if (IR_last_error>0) IR_error = IR_error_two; 
-    if (IR_last_error<=0) IR_error=- IR_error_two ; 
+    if (IR_last_error<=0) IR_error= -IR_error_two ; 
   }
   
   if (IR_error != IR_last_error)
@@ -233,8 +235,10 @@ void IR_follow()
   }
    IR_P= IR_Kp*IR_error; 
    IR_D= (int)((float)IR_Kd*(float)(IR_error - IR_recent_error)/(float)(IR_q + IR_m));
-   IR_gain= (IR_P+IR_D)/(sqrt(left_IR + right_IR));
+   IR_gain= (IR_P+IR_D)/sqrt(left_IR + right_IR);
    
+   if ((IR_gain)>max_turn) IR_gain = max_turn;
+   if (IR_gain < -max_turn) IR_gain= -max_turn;
    IR_servo_correction= 90+IR_gain;
    IR_motor_gain = IR_gain;
    
@@ -250,18 +254,23 @@ void IR_follow()
     t2=millis();
     velocity= ((count2 - count1)*(circumference)*1000.0)/( double((96.0*(t2-t1)))); 
     encoder_counter=0;
-   if ( ((velocity - target_velocity) > 2) && (abs(IR_gain)<(IR_error_two *IR_Kp) )) IR_motorSpeed= IR_motorSpeed - motorSpeedJump;
-   else if ( ((target_velocity - velocity) > 2) && (abs(IR_gain)<(IR_error_two *IR_Kp) )) IR_motorSpeed= IR_motorSpeed + motorSpeedJump;
+   if ( ((velocity - target_velocity) > 2) && (abs(IR_gain)<(IR_error_two *IR_Kp))) IR_motorSpeed= IR_motorSpeed - motorSpeedJump;
+   else if ( ((target_velocity - velocity) > 2) && (abs(IR_gain)<(IR_error_two *IR_Kp)) && (IR_motorSpeed < max_motorSpeed)) IR_motorSpeed= IR_motorSpeed + motorSpeedJump;
    
     LCD.clear();
     LCD.home();
     LCD.setCursor(0,0);
-    LCD.print("l_s1="); LCD.print(analogRead(left_IR1));  LCD.print(","); LCD.print("r_s1=");  LCD.print(analogRead(right_IR1));
-    delay(10);
-    LCD.setCursor(0,1);
-    LCD.print("L_s2="); LCD.print(analogRead(left_IR2)); LCD.print(","); LCD.print("r_s2="); LCD.print(analogRead(right_IR2));
+    LCD.print("ls1="); LCD.print(analogRead(left_IR_low));  LCD.print(","); LCD.print("rs1=");  LCD.print(analogRead(right_IR_low));
+   
+    LCD.print("g=");LCD.print(IR_gain);
+    LCD.setCursor(0,1); 
+  LCD.print("Ls="); LCD.print(analogRead(left_IR_high)); LCD.print(","); LCD.print("rs="); LCD.print(analogRead(right_IR_high));
+  LCD.print(left_IR); LCD.print(",");  LCD.print(right_IR);
+    
+  // Serial.print("ls1="); Serial.print(analogRead(left_IR_low));  Serial.print(","); Serial.print("rs1=");  Serial.print(analogRead(right_IR_low));
+  // Serial.print("Ls2="); Serial.print(analogRead(left_IR_high)); Serial.print(","); Serial.print("rs2="); Serial.print(analogRead(right_IR_high));
+  // Serial.print("\n------------------------------------------------------------------------");
     IR_count=0;
-    delay(20);
   }
   
   IR_count = IR_count+1; 
@@ -355,8 +364,8 @@ void Save (int address, int value)
            LCD.setCursor(0,0);
            LCD.print(display); 
            LCD.setCursor(0,1);
-           LCD.print(knob(6)/knobScale);
-           val = knob(6)/knobScale; 
+           LCD.print(knob(7)/knobScale);
+           val = knob(7)/knobScale; 
            delay(20);
          }
      return val;

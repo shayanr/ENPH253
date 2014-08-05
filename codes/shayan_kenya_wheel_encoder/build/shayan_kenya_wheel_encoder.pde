@@ -22,7 +22,10 @@ int IR_differenceEEPROM=24;
 
 // tape_follow() variables
 int left_sensor=1  ;                                          //the analog input number of the left QRD sensor
-int right_sensor=0;                                          //the analog input number of the right QRD sensor
+int right_sensor=0;  
+
+
+//the analog input number of the right QRD sensor
 int rock_sensor=0;                                          //the digital input of the rock sensor
 int left_s;
 int right_s;
@@ -93,7 +96,7 @@ int pulse_echo = 0;
 //Menu() variable
 int menu_next=6;                                        //Digital input number for the menu_next button
 int menu_set=7;                                          //Digital input number for the menu_set button 
-
+int motorSpeed = getEepromValue(motorSpeedEEPROM);
 int Kp = getEepromValue(KpEEPROM);
 int Kd = getEepromValue(KdEEPROM);
 float Ki=0.00;
@@ -102,10 +105,6 @@ int right_QRD_thresh=getEepromValue(right_QRD_threshEEPROM);
 int P,D;
 int error_one = 1;
 int error_two = getEepromValue(error_twoEEPROM);
-
-//Motor variables
-int max_motorSpeed=500;
-int motorSpeed = getEepromValue(motorSpeedEEPROM);
 int motorSpeedJump= getEepromValue(motorSpeedJumpEEPROM);
 int target_velocity=  getEepromValue(target_velocityEEPROM);
 
@@ -126,7 +125,6 @@ void setup()
   Serial.begin(9600);
   
 }
-
 void loop() 
 {
   
@@ -276,8 +274,8 @@ void Menu()
         {
           LCD.clear();
           LCD.setCursor(0,0);
-          LCD.print("Ki ="); LCD.print((double)((knob(7)/500.0)));
-          Ki = (double) (double(knob(7)/500.0));
+          LCD.print("Ki ="); LCD.print((double)((knob(6)/500.0)));
+          Ki = (double) (double(knob(6)/500.0));
           delay(10);
         }
       }
@@ -427,8 +425,8 @@ void Menu()
            LCD.setCursor(0,0);
            LCD.print(display); 
            LCD.setCursor(0,1);
-           LCD.print(knob(7)/knobScale);
-           val = knob(7)/knobScale; 
+           LCD.print(knob(6)/knobScale);
+           val = knob(6)/knobScale; 
            delay(20);
          }
      return val;
@@ -490,7 +488,7 @@ void tape_follow()
     velocity= ((count2 - count1)*(circumference)*1000.0)/( double((96.0*(t2-t1)))); 
     encoder_counter=0;
    if ( ((velocity - target_velocity) > 2) && (abs(gain)<(error_two *Kp) )) motorSpeed= motorSpeed - motorSpeedJump;
-   else if ( ((target_velocity - velocity) > 2) && (abs(gain)<(error_two *Kp)) && (motorSpeed < max_motorSpeed)) motorSpeed= motorSpeed + motorSpeedJump;
+   else if ( ((target_velocity - velocity) > 2) && (abs(gain)<(error_two *Kp) )) motorSpeed= motorSpeed + motorSpeedJump;
 
     
     LCD.clear();
