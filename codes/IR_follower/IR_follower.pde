@@ -16,6 +16,17 @@
 //Menu variable 
   int menu_next=6;                                        //Digital input number for the menu_next button
   int menu_set=7;                                          //Digital input number for the menu_set button 
+  
+  
+//sonar variables
+int sonar_distance=0 ;
+int sonar_state=0;
+int sonar_height = 3;
+int pulse_trig = 8;
+int pulse_echo = 1;
+int sonar_counter=0;
+int final_sonar_distance=0;
+int sonar_counter2=0;
 
 //EEPROM
 int target_velocityEEPROM=18;
@@ -248,6 +259,34 @@ void IR_follow()
     count1=encoder_counter;
     t1 = millis();
   }
+  
+  ///////sonar 
+  if (sonar_counter==100)
+  {
+     digitalWrite(pulse_trig,LOW);
+    delayMicroseconds(2);
+    digitalWrite(pulse_trig, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(pulse_trig, LOW);
+    
+    //Reading Pulse
+    sonar_distance = sonar_distance + (pulseIn(pulse_echo,HIGH))/58.2 ;
+    sonar_counter=0;
+    sonar_counter2 = sonar_counter2+1;
+  }
+  
+  if (sonar_counter2==2)
+  {
+    final_sonar_distance = sonar_distance/3;
+    sonar_distance==0;
+    sonar_counter2=0;
+    
+    LCD.clear();
+    LCD.home();
+    LCD.print("dis=");LCD.print(final_sonar_distance);
+    
+  }
+  
    if (IR_count=2000)
   {
     count2=encoder_counter;
@@ -257,14 +296,14 @@ void IR_follow()
    if ( ((velocity - target_velocity) > 2) && (abs(IR_gain)<(IR_error_two *IR_Kp))) IR_motorSpeed= IR_motorSpeed - motorSpeedJump;
    else if ( ((target_velocity - velocity) > 2) && (abs(IR_gain)<(IR_error_two *IR_Kp)) && (IR_motorSpeed < max_motorSpeed)) IR_motorSpeed= IR_motorSpeed + motorSpeedJump;
    
-    LCD.clear();
-    LCD.home();
-    LCD.setCursor(0,0);
-    LCD.print("ls1="); LCD.print(analogRead(left_IR_low));  LCD.print(","); LCD.print("rs1=");  LCD.print(analogRead(right_IR_low));
+ //   LCD.clear();
+  //  LCD.home();
+   // LCD.setCursor(0,0);
+  //  LCD.print("ls1="); LCD.print(analogRead(left_IR_low));  LCD.print(","); LCD.print("rs1=");  LCD.print(analogRead(right_IR_low));
    
-    LCD.print("g=");LCD.print(IR_gain);
+    //LCD.print("dis=");LCD.print(sonar_distance);
     LCD.setCursor(0,1); 
-  LCD.print("Ls="); LCD.print(analogRead(left_IR_high)); LCD.print(","); LCD.print("rs="); LCD.print(analogRead(right_IR_high));
+ // LCD.print("Ls="); LCD.print(analogRead(left_IR_high)); LCD.print(","); LCD.print("rs="); LCD.print(analogRead(right_IR_high));
   LCD.print(left_IR); LCD.print(",");  LCD.print(right_IR);
     
   // Serial.print("ls1="); Serial.print(analogRead(left_IR_low));  Serial.print(","); Serial.print("rs1=");  Serial.print(analogRead(right_IR_low));
@@ -272,8 +311,11 @@ void IR_follow()
   // Serial.print("\n------------------------------------------------------------------------");
     IR_count=0;
   }
+  if (final_sonar_distance > 10*sonar_height)
+    Turn();
   
   IR_count = IR_count+1; 
+  sonar_counter =sonar_counter +1;
   IR_m = IR_m + 1;
   IR_last_error = IR_error;
   
@@ -378,4 +420,34 @@ void Save (int address, int value)
 void encoder()
 {
   encoder_counter++ ;
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//turn()
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Turn()
+{
+  //turn full left back
+  int turn_gain=200;
+  int t_b=2000;                          //Time going back
+  int t_f=1500;                          //Time going forward
+  int turn_motorSpeed=500;
+  
+  RCServo0.write (90 -max_turn);    // turning the servo
+  motor.speed(right_motor, (-turn_motorSpeed - turn_gain));    //right motor
+  motor.speed(left_motor, (-turn_motorSpeed + turn_gain));     //left motor
+  delay(t_b);
+  
+  //turn full right forward
+  RCServo0.write (90 + max_turn);    // turning the servo
+  motor.speed(right_motor, (turn_motorSpeed - turn_gain));     //right motor
+  motor.speed(left_motor, (turn_motorSpeed + turn_gain)  );    //left motor
+  
+  delay(t_f);
+  
+  IR_last_error=0;
+  IR_error=0;
+  
 }
