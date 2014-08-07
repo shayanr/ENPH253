@@ -28,20 +28,22 @@ int start_IR_threshEEPROM=30;
 // tape_follow() variables
 int left_sensor=1  ;                                          //the analog input number of the left QRD sensor
 int right_sensor=0;                                          //the analog input number of the right QRD sensor
-//int rock_sensor=0;                                          //the digital input of the rock sensor
+int rock_sensor=5;                                          //the digital input of the rock sensor
 int left_s;
 int right_s;
 int q,gain,count=0;
+int second_count=0;
 int m=1;
 int recent_error=0;
 int error;
 int last_error=0;
 int servo_correction=90;                                //correction number get sent to the servo.
-int max_turn=60;
+int max_turn=48;
 int motor_gain = 0;
 int left_motor=0;                                       //mototr pin number for left_motor  
 int right_motor=1;                                      //motor pin number for right_motor  
 int left_motor_offset=155;                              //left motor goes faster
+int artifact_switch=0;                                  //helps debouncing 
 
 boolean coming_down= false;
 
@@ -49,7 +51,7 @@ boolean coming_down= false;
 int artifact_number;  
 int artifact_s=3;
 int arm_motor=2;                                        //motor number for the arm
-int arm_speed_up=1000;
+int arm_speed_up=900;
 int arm_speed_down=500;
 int arm_down=2;                                         //digital input of the arm_down push button
 
@@ -73,11 +75,12 @@ int IR_m=1;
 int IR_recent_error=0;
 int IR_error;
 int IR_last_error=0;
-int IR_error_one=1;
+int IR_error_one=10;
 int IR_error_two=getEepromValue(IR_error_twoEEPROM);
 int IR_servo_correction=0;
 int IR_motor_gain;
 int start_IR_thresh=getEepromValue(start_IR_threshEEPROM);
+int IR_second_count=0;
 
 //Wheel encoder
 int encoder_pin=0;                                          //connected to INT0
@@ -85,8 +88,10 @@ long encoder_counter = 0.0;
 long count1,count2;
 long t1,t2;
 double velocity=0.0;
+double final_velocity;
 double circumference = 10.0;
-
+int encoderstop = 600;
+int forward = 1;
 
 //sonar variables
 int sonar_distance=0 ;
@@ -106,19 +111,23 @@ int state=0;                                             //0 means full run, 1 m
 
 int Kp = getEepromValue(KpEEPROM);
 int Kd = getEepromValue(KdEEPROM);
-float Ki=0.02;
+float Ki=0.01;
 int left_QRD_thresh=getEepromValue(left_QRD_threshEEPROM);
 int right_QRD_thresh=getEepromValue(right_QRD_threshEEPROM);
 int P,D;
 int error_one = 1;
-int error_two_temp = getEepromValue(error_twoEEPROM);
-double error_two;
+int error_two = getEepromValue(error_twoEEPROM);
+
+
 
 //Motor variables
 int max_motorSpeed=500;
 int motorSpeed = getEepromValue(motorSpeedEEPROM);
 int motorSpeedJump= getEepromValue(motorSpeedJumpEEPROM);
 int target_velocity=  getEepromValue(target_velocityEEPROM);
+
+int line_to_rock_delay=700;                               //delay for going straight after detecting IR
+int motorSpeed_case2= 375;
 
 //Arm_up() variables
 int arm_up=0;
@@ -143,6 +152,11 @@ void setup()
   
 }
 
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+//LOOP()
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void loop() 
 {
   
@@ -156,14 +170,58 @@ void loop()
     switch(state)
     {
       case 0:
-        if ( ( analogRead(right_IR_high)> start_IR_thresh) && (analogRead(left_IR_high)> start_IR_thresh))
+       motorSpeed = getEepromValue(motorSpeedEEPROM);
+       IR_motorSpeed= IR_motorSpeed = getEepromValue(IR_motorSpeedEEPROM);
+      
+        while (( analogRead(right_IR_high)< start_IR_thresh) && (analogRead(left_IR_high)< start_IR_thresh))
         {
-          Arm_up();
+            if (digitalRead(artifact_s) != LOW)                      //No artifact is attached
+            {
+                 tape_follow();
+                  if(digitalRead(arm_down)!= LOW)                        //arm is not down
+                  {
+                  //  motor.speed(arm_motor,800);
+                    tape_follow();
+                    motor.speed(arm_motor,arm_speed_down);                    //brings the arm down
+                    
+                  }
+                  else                                                   //arm is down and there is no artifact attached 
+                  {
+                    tape_follow();
+                    motor.stop(arm_motor);
+                  }
+             }
+            
+             else                                                    //artifact is attached
+             {
+                  tape_follow();
+                  
+                  artifact_switch++;
+                  if(artifact_switch==10)
+                  {
+                    artifact_number++;
+                    artifact_switch=0;
+                    motor.speed(arm_motor,-arm_speed_up);                        //brings the arm up
+                  }
+                  
+             }
           
-          while(final_sonar_distance < 10*sonar_height)           //if we detect cliff
-          {
+        }
+
+
+//////////////////////Entering Rockpit
+          motor_stop();
+          delay(1000);//remove after testing 
+          Arm_up();
+          delay(1000);//remove after testing
+          RCServo0.write(90);
+          motor.speed(left_motor, 500);    //left motor
+          motor.speed(right_motor, 500);     //right motor 
+          delay(line_to_rock_delay);    
+          
+          do {
             IR_follow();
-          }
+          }while(final_sonar_distance < (10*sonar_height)) ;          //if we detect cliff
           
             motor_stop();
             
@@ -173,47 +231,32 @@ void loop()
               motor.speed(arm_motor,arm_speed_down);    
               arm_up=0;                                    //arm is down
             }
-            delay(200);
+            motor.stop(arm_motor);
+            delay(500);//remove after testing 
             Arm_up();            
             Turn();
-            turning_back=1;                               // indicates turning back
-          }
-          
-        else               //No IR detected
-        {
-          if (digitalRead(artifact_s) != LOW)                      //No artifact is attached
-          {
-             tape_follow();
-            if(digitalRead(arm_down)!= LOW)                        //arm is not down
+            delay(1000);//remove after testing 
+  
+////////////////////Detecting the IR back   
+
+            while(( analogRead(right_IR_high)> start_IR_thresh) || (analogRead(left_IR_high)> start_IR_thresh))
             {
-            //  motor.speed(arm_motor,800);
-              motor.speed(arm_motor,arm_speed_down);                    //brings the arm down
-              tape_follow();
+              IR_follow();
             }
-            else                                                   //arm is down and there is no artifact attached 
-            {
-              tape_follow();
-              motor.stop(arm_motor);
-            }
-          }
-    
-          else                                                    //artifact is attached
-          {
-            artifact_number++;
-            motor.speed(arm_motor,-arm_speed_up);                        //brings the arm up
-            tape_follow();
-          }
-         }
-        break;
+            motor_stop();
+            //see position on the track
+        
+     break;
+     
    ///////////////////////////////////////////////////////////////////////////////////////////////
      case 1:
-     if ( ( analogRead(right_IR_high)> start_IR_thresh) || (analogRead(left_IR_high)> start_IR_thresh))
-        {
-          motor_stop();
-          Turn(); 
-        }
-        else               //No IR detected
-        {
+     
+      motorSpeed = getEepromValue(motorSpeedEEPROM);
+      artifact_switch=0;
+      velocity=0;
+     
+     while ( digitalRead(rock_sensor)!= LOW)
+     {
           if (digitalRead(artifact_s) != LOW)                      //No artifact is attached
           {
              tape_follow();
@@ -232,18 +275,113 @@ void loop()
     
           else                                                    //artifact is attached
           {
-            artifact_number++;
-            motor.speed(arm_motor,-arm_speed_up);                        //brings the arm up
+             tape_follow(); 
+             artifact_switch++;
+             if(artifact_switch==10)
+            {
+                  artifact_number++;
+                  artifact_switch=0;
+                  motor.speed(arm_motor,-arm_speed_up);                        //brings the arm up
+            }
+          }
+        }
+         
+         motor.stop(arm_motor);
+          motor_stop();
+          delay(500);
+          half_Turn(); 
+          
+          
+          motorSpeed=getEepromValue(motorSpeedEEPROM);
+          while(analogRead(left_sensor)<left_QRD_thresh && !stopbutton())        //go straight till line is detected
+          {
+            RCServo0.write(80);
+            motor.speed(left_motor,400);
+            motor.speed(right_motor,350);
+          }
+          
+          while(!stopbutton())
+          {
             tape_follow();
           }
-         }
-     
+           
+           
      break;
   ///////////////////////////////////////////////////////////////////////////////////////////////
      case 2:
+     
+     
+       while (digitalRead(arm_down)!= LOW)
+            {
+              motor.speed(arm_motor,arm_speed_down); // going forward    
+              arm_up=0;                                    //arm is down
+            }
+            motor.stop(arm_motor);
+     
+        RCServo0.write (95);    // turning the servo
+        left_motor_offset= (0.3)*motorSpeed_case2; //note the leftoffset fraction
+        motor.speed(left_motor, motorSpeed_case2 + left_motor_offset);    //left motor
+        motor.speed(right_motor, motorSpeed_case2 );     //right motor
+        
+        while(encoder_counter <= encoderstop)
+      {
+         //PRINTING BRANCH
+          if (count > 1000)
+          {
+            LCD.clear(); LCD.home();
+            LCD.print("En. Count ="); LCD.print(encoder_counter);
+            count =0;
+          }
+         //PRINTING BRANCH
+          count = count +1;
+          if (digitalRead(artifact_s) == LOW)
+          {
+             motor.speed(arm_motor,-arm_speed_up); 
+          }
+          else
+            motor.stop(arm_motor);
+      } 
+       
+          motor_stop();
+        // Arm_up(); 
+          delay(500);  
+          encoder_counter = 0;
+
+      //going backwards
+       RCServo0.write(90);
+       left_motor_offset=(0.2)*motorSpeed_case2; // tuning left motor
+       motor.speed(left_motor, -(motorSpeed_case2 + left_motor_offset));    //left motor
+       motor.speed(right_motor, -(motorSpeed_case2));     //right motor
+       
+       while(encoder_counter <= encoderstop)
+       {
+         //PRINTING BRANCH
+         if (count > 1000)
+          {
+            LCD.clear(); LCD.home();
+            LCD.print("En. Count ="); LCD.print(encoder_counter);
+            count = 0;
+          }
+         //PRINTING BRANCH 
+          count = count +1;
+       }
+       
+          motor.speed(left_motor,500);
+          motor.speed(right_motor,500);
+          delay(100);
+          motor.stop(left_motor);
+          motor.stop(right_motor);
+          forward = 0;
+          encoder_counter = 0;
+        
+    
+   
+       
+     state=0;
      break;
      
-    }  
+    } 
+   break; 
   }
 }
 
@@ -437,7 +575,34 @@ void Menu()
       }
     }
    delay(200);
-   
+   if(startbutton())
+      return;
+      
+       while(digitalRead(menu_next)!= LOW && !startbutton())
+    {
+      displayValue("Rock_delay =",line_to_rock_delay);
+      if(digitalRead(menu_set) == LOW)
+      {
+         line_to_rock_delay = SetValue("Rock_delay=",0.5);
+         //Save(stateEEPROM, state);
+       }
+    }
+    delay(200);
+    if(startbutton())
+      return;
+        
+      
+        
+  while(digitalRead(menu_next)!= LOW && !startbutton())
+    {
+      displayValue("IR_Speed=",IR_motorSpeed);
+      if(digitalRead(menu_set) == LOW)
+      {
+         IR_motorSpeed = SetValue("Speed =",1);
+         Save(IR_motorSpeedEEPROM, IR_motorSpeed);
+       }
+    }
+    delay(200);
     if(startbutton())
       return;
       
@@ -500,12 +665,11 @@ void Menu()
       
      while(digitalRead(menu_next) != LOW && !startbutton())
     {
-      displayValue("Error 2=",error_two_temp);
+      displayValue("Error 2=",error_two);
       if(digitalRead(menu_set) == LOW)
       {
-        error_two_temp = SetValue("Error 2=",12);
-        error_two=error_two_temp/10;
-        Save(error_twoEEPROM,error_two_temp);
+        error_two = SetValue("Error 2=",12);
+        Save(error_twoEEPROM,error_two);
       }
     }
     delay(200);
@@ -555,14 +719,16 @@ void Menu()
 void tape_follow()
 {
 
+  
   left_s = analogRead(left_sensor);                                  //Left QRD attached to analog 0
   right_s = analogRead(right_sensor);                                 //right QRD attached to analog 1
 
-  if ((left_s>left_QRD_thresh)&&(right_s>right_QRD_thresh)) error = 0; 
+  if ((left_s>left_QRD_thresh)&&(right_s>right_QRD_thresh)) { error = 0; I=0;} 
   if ((left_s>left_QRD_thresh)&&(right_s<right_QRD_thresh)) error = -error_one;     //Turn left
   if ((left_s<left_QRD_thresh)&&(right_s>right_QRD_thresh)) error = +error_one;     //Turn right
   if ((left_s<left_QRD_thresh)&&(right_s<right_QRD_thresh)) 
   { 
+  //  second_state_counter++;
     if (last_error>0) error = error_two; 
     if (last_error<=0) error=-error_two; 
   }
@@ -583,12 +749,15 @@ void tape_follow()
     I=(Ki)*(I+ (error*(q+m)));
   }
   
-  gain=P+D+I;
+  gain=(P+D+I)/10;
   if ((gain)>max_turn) gain = max_turn;
   if (gain < -max_turn) gain=-max_turn; 
 
   servo_correction= 90+gain;
-  motor_gain = gain;
+ // if (second_state_counter >= off_tape)
+  //{
+ //   motor_gain
+  motor_gain = 1.5*gain;
   
  ///////////////////Wheel encoder
   if(count==1)
@@ -597,35 +766,48 @@ void tape_follow()
     t1 = millis();
   }
   
-  if (count==2000)
+  if (count==300)
   {
+    second_count=second_count+1;
     count2=encoder_counter;
     t2=millis();
-    velocity= ((count2 - count1)*(circumference)*1000.0)/( double((96.0*(t2-t1)))); 
+    velocity= velocity + ((count2 - count1)*(circumference)*1000.0)/( double((96.0*(t2-t1)))); 
     encoder_counter=0;
-   if ( ((velocity - target_velocity) > 2) && (abs(gain)<(error_two *Kp) )) motorSpeed= motorSpeed - motorSpeedJump;
-   else if ( ((target_velocity - velocity) > 2) && (abs(gain)<(error_two *Kp)) && (motorSpeed < max_motorSpeed)) motorSpeed= motorSpeed + motorSpeedJump;
+    count=0;
+  }
+  
+  if (second_count==5)
+  {
+    final_velocity= velocity /5.0;
+    velocity=0;
+    second_count=0;
+  
 
-    
+   if ( ((final_velocity - target_velocity) > 2) && (abs(gain)<(error_two *Kp) )) motorSpeed= motorSpeed - motorSpeedJump;
+   else if ( ((target_velocity - final_velocity) > 2) && (abs(gain)<(error_two *Kp)) && (motorSpeed < max_motorSpeed)) motorSpeed= motorSpeed + motorSpeedJump;
+
+  
+  
     LCD.clear();
     LCD.home();
     LCD.setCursor(0,0);
-    LCD.print("line follow");
+    //LCD.print("line follow");
    // LCD.print("l_s="); LCD.print(l);  LCD.print(","); LCD.print("r_s=");  LCD.print( right_s);
-   // LCD.print("g=");LCD.print(gain);
+   LCD.print("g=");LCD.print(gain);
    //left_IR = analogRead(left_IR_high);
    //right_IR = analogRead(right_IR_high); 
     LCD.setCursor(0,1);
       LCD.print("l:");LCD.print(left_s); LCD.print(",");  LCD.print("r:");LCD.print(right_s);
     //LCD.print("velocity="); LCD.print(velocity);
   
-    count=0;
+    
     
    //Serial.print("t1-t2= "); Serial.print(t1-t2);Serial.print("\n");
    //Serial.print("count1-count2= "); Serial.print(count1-count2);Serial.print("\n");
    //Serial.print("speed= "); Serial.print(velocity);
    //Serial.print("\n--------------------------------------\n");
    //delay(1000);
+  
   }
   
   count=count+1; 
@@ -633,7 +815,7 @@ void tape_follow()
   last_error=error;
   
  
-    
+  left_motor_offset= (0.4)*motorSpeed;  
   RCServo0.write (servo_correction);    // turning the servo
   motor.speed(left_motor, motorSpeed + motor_gain + left_motor_offset);    //left motor
   motor.speed(right_motor, motorSpeed - motor_gain);     //right motor
@@ -689,7 +871,7 @@ void IR_follow()
   }
   
   ///////sonar 
-  if (sonar_counter==100)
+  if (sonar_counter==50)
   {
      digitalWrite(pulse_trig,LOW);
     delayMicroseconds(2);
@@ -703,9 +885,9 @@ void IR_follow()
     sonar_counter2 = sonar_counter2+1;
   }
   
-  if (sonar_counter2==2)
+  if (sonar_counter2==5)
   {
-    final_sonar_distance = sonar_distance/3;
+    final_sonar_distance = sonar_distance/6.0;
     sonar_distance=0;
     sonar_counter2=0;
     
@@ -715,14 +897,25 @@ void IR_follow()
     
   }
   
-   if (IR_count=2000)
+   if (IR_count==300)
   {
+    IR_second_count=IR_second_count+1;
     count2=encoder_counter;
     t2=millis();
-    velocity= ((count2 - count1)*(circumference)*1000.0)/( double((96.0*(t2-t1)))); 
+    velocity= velocity + ((count2 - count1)*(circumference)*1000.0)/( double((96.0*(t2-t1)))); 
     encoder_counter=0;
-   if ( ((velocity - target_velocity) > 2) && (abs(IR_gain)<(IR_error_two *IR_Kp))) IR_motorSpeed= IR_motorSpeed - motorSpeedJump;
-   else if ( ((target_velocity - velocity) > 2) && (abs(IR_gain)<(IR_error_two *IR_Kp)) && (IR_motorSpeed < max_motorSpeed)) IR_motorSpeed= IR_motorSpeed + motorSpeedJump;
+    IR_count=0;
+  }
+  
+   if (IR_second_count==2)
+  {
+    final_velocity= velocity /3.0;
+    velocity=0;
+    IR_second_count=0;
+  
+
+   if ( ((final_velocity - target_velocity) > 2) && (abs(IR_gain)<(IR_error_two *IR_Kp))) IR_motorSpeed= IR_motorSpeed - motorSpeedJump;
+   else if ( ((target_velocity - final_velocity) > 2) && (abs(IR_gain)<(IR_error_two *IR_Kp)) && (IR_motorSpeed < max_motorSpeed)) IR_motorSpeed= IR_motorSpeed + motorSpeedJump;
    
    // LCD.clear();
     //LCD.home();
@@ -731,17 +924,15 @@ void IR_follow()
    
     //LCD.print("dis=");LCD.print(sonar_distance);
    // LCD.print(" IR MODE");
-    //LCD.setCursor(0,1); 
+    LCD.setCursor(0,1); 
  // LCD.print("Ls="); LCD.print(analogRead(left_IR_high)); LCD.print(","); LCD.print("rs="); LCD.print(analogRead(right_IR_high));
-  //LCD.print(left_IR); LCD.print(",");  LCD.print(right_IR);
+  LCD.print(left_IR); LCD.print(",");  LCD.print(right_IR);
     
   // Serial.print("ls1="); Serial.print(analogRead(left_IR_low));  Serial.print(","); Serial.print("rs1=");  Serial.print(analogRead(right_IR_low));
   // Serial.print("Ls2="); Serial.print(analogRead(left_IR_high)); Serial.print(","); Serial.print("rs2="); Serial.print(analogRead(right_IR_high));
   // Serial.print("\n------------------------------------------------------------------------");
     IR_count=0;
   }
-  if (final_sonar_distance > 10*sonar_height)
-    Turn();
   
   IR_count = IR_count+1; 
   sonar_counter =sonar_counter +1;
@@ -749,7 +940,7 @@ void IR_follow()
   IR_last_error = IR_error;
   
   
-  
+  left_motor_offset= (0.4)*IR_motorSpeed;
   RCServo0.write (IR_servo_correction);    // turning the servo
   motor.speed(left_motor, IR_motorSpeed + IR_motor_gain + left_motor_offset);    //left motor
   motor.speed(right_motor, IR_motorSpeed - IR_motor_gain);     //right motor
@@ -781,9 +972,32 @@ void Turn()
   
   delay(t_f);
   
+  motor.stop(left_motor);
+  motor.stop(right_motor);
   last_error=0;
   error=0;
   
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+//half_Turn()
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+void half_Turn()
+{
+  //turn full left back
+  int turn_gain=200;
+  int t_b=1700;                          //Time going back
+  int t_f=1500;                          //Time going forward
+  int turn_motorSpeed=375;
+  
+  RCServo0.write (90 -max_turn);    // turning the servo
+  motor.speed(right_motor, (-turn_motorSpeed - turn_gain));    //right motor
+  motor.speed(left_motor, (-turn_motorSpeed + turn_gain));     //left motor
+  delay(t_b);
+  
+  motor.stop(left_motor);
+  motor.stop(right_motor);
 }
  
  
@@ -803,6 +1017,9 @@ void Arm_up()
 {
   if (arm_up != 1)
   {
+    motor.speed(arm_motor,-arm_speed_up); 
+    delay(700);
+    motor.stop(arm_motor);
     //bring the arm up 
     arm_up=1;
   }
@@ -815,7 +1032,7 @@ void motor_stop()
 {
   motor.speed(left_motor,-500);
   motor.speed(right_motor,-500);
-  delay(300);
+  delay(100);
   motor.stop(left_motor);
   motor.stop(right_motor);
 }

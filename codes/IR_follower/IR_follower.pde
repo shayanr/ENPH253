@@ -320,7 +320,7 @@ void IR_follow()
   IR_last_error = IR_error;
   
   
-  
+  left_motor_offset= (0.4)*IR_motorSpeed;
   RCServo0.write (IR_servo_correction);    // turning the servo
   motor.speed(left_motor, IR_motorSpeed + IR_motor_gain + left_motor_offset);    //left motor
   motor.speed(right_motor, IR_motorSpeed - IR_motor_gain);     //right motor
